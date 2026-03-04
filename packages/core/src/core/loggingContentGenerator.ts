@@ -31,6 +31,7 @@ import {
   logApiResponse,
 } from '../telemetry/loggers.js';
 import type { ContentGenerator } from './contentGenerator.js';
+import { OpenAIContentGenerator } from './openaiContentGenerator.js';
 import { CodeAssistServer } from '../code_assist/server.js';
 import { toContents } from '../code_assist/converter.js';
 import { isStructuredError } from '../utils/quotaErrorDetection.js';
@@ -196,6 +197,22 @@ export class LoggingContentGenerator implements ContentGenerator {
     req: GenerateContentParameters,
     method: 'generateContent' | 'generateContentStream',
   ): ServerDetails {
+    // Case 0: OpenAI-compatible provider.
+    if (this.wrapped instanceof OpenAIContentGenerator) {
+      const baseUrl = process.env['GEMINI_CLI_API_BASE_URL'] ?? 'unknown';
+      try {
+        const url = new URL(baseUrl);
+        const port = url.port
+          ? parseInt(url.port, 10)
+          : url.protocol === 'https:'
+            ? 443
+            : 80;
+        return { address: url.hostname, port };
+      } catch {
+        return { address: baseUrl, port: 0 };
+      }
+    }
+
     // Case 1: Authenticated with a Google account (`gcloud auth login`).
     // Requests are routed through the internal CodeAssistServer.
     if (this.wrapped instanceof CodeAssistServer) {

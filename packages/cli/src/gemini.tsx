@@ -73,6 +73,7 @@ import {
   ValidationCancelledError,
   ValidationRequiredError,
   type AdminControlsSettings,
+  getApiProvider,
 } from '@google/gemini-cli-core';
 import {
   initializeApp,
@@ -439,6 +440,18 @@ export async function main() {
         SettingScope.User,
         'security.auth.selectedType',
         AuthType.COMPUTE_ADC,
+      );
+    }
+  }
+
+  // For non-Gemini providers, auto-select API key auth to skip the auth dialog
+  const apiProvider = getApiProvider();
+  if (apiProvider !== 'gemini' && process.env['GEMINI_API_KEY']) {
+    if (!settings.merged.security.auth.selectedType) {
+      settings.setValue(
+        SettingScope.User,
+        'security.auth.selectedType',
+        AuthType.USE_GEMINI,
       );
     }
   }

@@ -18,6 +18,7 @@ import {
   AuthType,
   createContentGenerator,
   createContentGeneratorConfig,
+  getApiProvider,
 } from '../core/contentGenerator.js';
 import { PromptRegistry } from '../prompts/prompt-registry.js';
 import { ResourceRegistry } from '../resources/resource-registry.js';
@@ -1237,7 +1238,12 @@ export class Config implements McpContext {
 
     // Only reset when we have explicit "no access" (hasAccessToPreviewModel === false).
     // When null (quota not fetched) or true, we preserve the saved model.
-    if (isPreviewModel(this.model) && this.hasAccessToPreviewModel === false) {
+    // Skip this for non-Gemini providers where the model name is provider-specific.
+    if (
+      getApiProvider() === 'gemini' &&
+      isPreviewModel(this.model) &&
+      this.hasAccessToPreviewModel === false
+    ) {
       this.setModel(DEFAULT_GEMINI_MODEL_AUTO);
     }
 

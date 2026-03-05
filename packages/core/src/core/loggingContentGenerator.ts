@@ -32,6 +32,7 @@ import {
 } from '../telemetry/loggers.js';
 import type { ContentGenerator } from './contentGenerator.js';
 import { OpenAIContentGenerator } from './openaiContentGenerator.js';
+import { AnthropicContentGenerator } from './anthropicContentGenerator.js';
 import { CodeAssistServer } from '../code_assist/server.js';
 import { toContents } from '../code_assist/converter.js';
 import { isStructuredError } from '../utils/quotaErrorDetection.js';
@@ -197,9 +198,16 @@ export class LoggingContentGenerator implements ContentGenerator {
     req: GenerateContentParameters,
     method: 'generateContent' | 'generateContentStream',
   ): ServerDetails {
-    // Case 0: OpenAI-compatible provider.
-    if (this.wrapped instanceof OpenAIContentGenerator) {
-      const baseUrl = process.env['GEMINI_CLI_API_BASE_URL'] ?? 'unknown';
+    // Case 0: Non-Gemini provider (OpenAI-compatible or Anthropic).
+    if (
+      this.wrapped instanceof OpenAIContentGenerator ||
+      this.wrapped instanceof AnthropicContentGenerator
+    ) {
+      const baseUrl =
+        process.env['GEMINI_CLI_API_BASE_URL'] ??
+        (this.wrapped instanceof AnthropicContentGenerator
+          ? 'https://api.anthropic.com'
+          : 'unknown');
       try {
         const url = new URL(baseUrl);
         const port = url.port

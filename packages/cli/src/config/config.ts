@@ -43,6 +43,7 @@ import {
   type HookDefinition,
   type HookEventName,
   type OutputFormat,
+  getApiProvider,
 } from '@google/gemini-cli-core';
 import {
   type Settings,
@@ -709,14 +710,27 @@ export async function loadCliConfig(
   );
   policyEngineConfig.nonInteractive = !interactive;
 
+  const apiProvider = getApiProvider();
   const defaultModel = PREVIEW_GEMINI_MODEL_AUTO;
   const specifiedModel =
     argv.model || process.env['GEMINI_MODEL'] || settings.model?.name;
 
-  const resolvedModel =
-    specifiedModel === GEMINI_MODEL_ALIAS_AUTO
-      ? defaultModel
-      : specifiedModel || defaultModel;
+  let resolvedModel: string;
+  if (apiProvider !== 'gemini') {
+    // For non-Gemini providers, require an explicit model name via --model or GEMINI_MODEL
+    if (!specifiedModel) {
+      throw new FatalConfigError(
+        `--model is required when GEMINI_CLI_API_PROVIDER=${apiProvider}. ` +
+          `Example: --model gpt-4o (for openai) or --model claude-sonnet-4-20250514 (for anthropic)`,
+      );
+    }
+    resolvedModel = specifiedModel;
+  } else {
+    resolvedModel =
+      specifiedModel === GEMINI_MODEL_ALIAS_AUTO
+        ? defaultModel
+        : specifiedModel || defaultModel;
+  }
   const sandboxConfig = await loadSandboxConfig(settings, argv);
   const screenReader =
     argv.screenReader !== undefined

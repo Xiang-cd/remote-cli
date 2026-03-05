@@ -12,6 +12,7 @@ import {
   loadApiKey,
   debugLogger,
   isAccountSuspendedError,
+  getApiProvider,
 } from '@google/gemini-cli-core';
 import { getErrorMessage } from '@google/gemini-cli-core';
 import { AuthState } from '../types.js';
@@ -87,6 +88,25 @@ export const useAuthCommand = (
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
     (async () => {
       if (authState !== AuthState.Unauthenticated) {
+        return;
+      }
+
+      // For non-Gemini providers (OpenAI, Anthropic), auto-select API key auth
+      // and skip the auth dialog entirely.
+      const provider = getApiProvider();
+      if (provider !== 'gemini' && process.env['GEMINI_API_KEY']) {
+        try {
+          await config.refreshAuth(AuthType.USE_GEMINI);
+          debugLogger.log(
+            `Authenticated via API key for ${provider} provider.`,
+          );
+          setAuthError(null);
+          setAuthState(AuthState.Authenticated);
+        } catch (e) {
+          onAuthError(
+            `Failed to authenticate for ${provider} provider: ${getErrorMessage(e)}`,
+          );
+        }
         return;
       }
 

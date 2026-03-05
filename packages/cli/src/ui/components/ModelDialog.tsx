@@ -21,6 +21,7 @@ import {
   getDisplayString,
   AuthType,
   PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
+  getApiProvider,
 } from '@google/gemini-cli-core';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { theme } from '../semantic-colors.js';
@@ -37,6 +38,48 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
   const settings = useSettings();
   const [view, setView] = useState<'main' | 'manual'>('main');
   const [persistMode, setPersistMode] = useState(false);
+
+  const apiProvider = getApiProvider();
+
+  useKeypress(
+    (key) => {
+      if (apiProvider !== 'gemini' && key.name === 'escape') {
+        onClose();
+        return true;
+      }
+      return false;
+    },
+    { isActive: apiProvider !== 'gemini' },
+  );
+
+  if (apiProvider !== 'gemini') {
+    const currentModel = config?.getModel() || '(not set)';
+    return (
+      <Box
+        borderStyle="round"
+        borderColor={theme.border.default}
+        flexDirection="column"
+        padding={1}
+        width="100%"
+      >
+        <Text bold>Model ({apiProvider} provider)</Text>
+        <Box marginTop={1}>
+          <Text color={theme.text.primary}>
+            Current model: <Text bold>{currentModel}</Text>
+          </Text>
+        </Box>
+        <Box marginTop={1}>
+          <Text color={theme.text.secondary}>
+            Use --model flag or GEMINI_MODEL env var to change the model for{' '}
+            {apiProvider} providers.
+          </Text>
+        </Box>
+        <Box marginTop={1}>
+          <Text color={theme.text.secondary}>(Press Esc to close)</Text>
+        </Box>
+      </Box>
+    );
+  }
 
   // Determine the Preferred Model (read once when the dialog opens).
   const preferredModel = config?.getModel() || DEFAULT_GEMINI_MODEL_AUTO;

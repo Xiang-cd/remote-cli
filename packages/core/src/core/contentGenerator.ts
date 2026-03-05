@@ -24,6 +24,7 @@ import { FakeContentGenerator } from './fakeContentGenerator.js';
 import { parseCustomHeaders } from '../utils/customHeaderUtils.js';
 import { RecordingContentGenerator } from './recordingContentGenerator.js';
 import { OpenAIContentGenerator } from './openaiContentGenerator.js';
+import { AnthropicContentGenerator } from './anthropicContentGenerator.js';
 import { getVersion, resolveModel } from '../../index.js';
 import type { LlmRole } from '../telemetry/llmRole.js';
 
@@ -176,11 +177,9 @@ export async function createContentGenerator(
       return createOpenAIGenerator(config, gcConfig);
     }
 
-    // Route to Anthropic adapter when configured (Phase 2)
+    // Route to native Anthropic adapter
     if (provider === 'anthropic') {
-      throw new Error(
-        'Anthropic provider is not yet implemented. Use GEMINI_CLI_API_PROVIDER=openai with an OpenAI-compatible Anthropic proxy instead.',
-      );
+      return createAnthropicGenerator(config, gcConfig);
     }
 
     // Default: Gemini provider (existing logic)
@@ -306,4 +305,34 @@ async function createGeminiGenerator(
   throw new Error(
     `Error creating contentGenerator: Unsupported authType: ${config.authType}`,
   );
+}
+
+async function createAnthropicGenerator(
+  config: ContentGeneratorConfig,
+  gcConfig: Config,
+): Promise<ContentGenerator> {
+  const baseURL = process.env['GEMINI_CLI_API_BASE_URL'];
+  const apiKey = config.apiKey || process.env['GEMINI_API_KEY'];
+  if (!apiKey) {
+    throw new Error(
+      'GEMINI_API_KEY is required when GEMINI_CLI_API_PROVIDER=anthropic.',
+    );
+  }
+
+  const version = await getVersion();
+  const model = gcConfig.getModel();
+  const customHeadersEnv =
+    process.env['GEMINI_CLI_CUSTOM_HEADERS'] || undefined;
+  const customHeadersMap = parseCustomHeaders(customHeadersEnv);
+
+  const anthropicGenerator = new AnthropicContentGenerator({
+    apiKey,
+    baseURL,
+    defaultHeaders: {
+      ...customHeadersMap,
+      'User-Agent': `GeminiCLI/${version}/${model} (${process.platform}; ${process.arch})`,
+    },
+  });
+
+  return new LoggingContentGenerator(anthropicGenerator, gcConfig);
 }

@@ -157,6 +157,55 @@ export function getApiProvider(): ApiProvider {
   return 'gemini';
 }
 
+export interface ApiModelInfo {
+  id: string;
+  owned_by?: string;
+}
+
+/**
+ * Fetches available models from the configured API provider's /models endpoint.
+ * Works with OpenAI-compatible and Anthropic APIs.
+ */
+export async function listModelsFromApi(): Promise<ApiModelInfo[]> {
+  const provider = getApiProvider();
+  const baseURL = process.env['GEMINI_CLI_API_BASE_URL'];
+  const apiKey = process.env['GEMINI_API_KEY'];
+
+  if (provider === 'gemini' || !apiKey) {
+    return [];
+  }
+
+  const base = (baseURL ?? '').replace(/\/+$/, '');
+
+  const headers: Record<string, string> = {};
+  let modelsUrl: string;
+
+  if (provider === 'anthropic') {
+    headers['x-api-key'] = apiKey;
+    headers['anthropic-version'] = '2023-06-01';
+    modelsUrl = base ? `${base}/v1/models` : 'https://api.anthropic.com/v1/models';
+  } else {
+    headers['Authorization'] = `Bearer ${apiKey}`;
+    modelsUrl = base ? `${base}/models` : 'https://api.openai.com/v1/models';
+  }
+
+  try {
+    const response = await fetch(modelsUrl, { headers });
+    if (!response.ok) {
+      return [];
+    }
+    const json = (await response.json()) as {
+      data?: Array<{ id: string; owned_by?: string }>;
+    };
+    const models = (json.data ?? [])
+      .map((m) => ({ id: m.id, owned_by: m.owned_by }))
+      .sort((a, b) => a.id.localeCompare(b.id));
+    return models;
+  } catch {
+    return [];
+  }
+}
+
 export async function createContentGenerator(
   config: ContentGeneratorConfig,
   gcConfig: Config,
@@ -292,7 +341,11 @@ async function createGeminiGenerator(
         'x-gemini-api-privileged-user-id': `${installationId}`,
       };
     }
-    const httpOptions = { headers };
+    const customBaseUrl = process.env['GEMINI_CLI_API_BASE_URL'] || undefined;
+    const httpOptions: Record<string, unknown> = { headers };
+    if (customBaseUrl) {
+      httpOptions['baseUrl'] = customBaseUrl;
+    }
 
     const googleGenAI = new GoogleGenAI({
       apiKey: config.apiKey === '' ? undefined : config.apiKey,

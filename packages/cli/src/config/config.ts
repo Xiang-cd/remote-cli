@@ -717,14 +717,7 @@ export async function loadCliConfig(
 
   let resolvedModel: string;
   if (apiProvider !== 'gemini') {
-    // For non-Gemini providers, require an explicit model name via --model or GEMINI_MODEL
-    if (!specifiedModel) {
-      throw new FatalConfigError(
-        `--model is required when GEMINI_CLI_API_PROVIDER=${apiProvider}. ` +
-          `Example: --model gpt-4o (for openai) or --model claude-sonnet-4-20250514 (for anthropic)`,
-      );
-    }
-    resolvedModel = specifiedModel;
+    resolvedModel = specifiedModel || defaultModel;
   } else {
     resolvedModel =
       specifiedModel === GEMINI_MODEL_ALIAS_AUTO

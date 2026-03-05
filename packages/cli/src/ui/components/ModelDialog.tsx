@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { useCallback, useContext, useMemo, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { Box, Text } from 'ink';
 import {
   PREVIEW_GEMINI_MODEL,
@@ -22,6 +22,8 @@ import {
   AuthType,
   PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
   getApiProvider,
+  listModelsFromApi,
+  type ApiModelInfo,
 } from '@google/gemini-cli-core';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { theme } from '../semantic-colors.js';
@@ -40,6 +42,56 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
   const [persistMode, setPersistMode] = useState(false);
 
   const apiProvider = getApiProvider();
+  const [remoteModels, setRemoteModels] = useState<ApiModelInfo[]>([]);
+  const [modelsLoading, setModelsLoading] = useState(apiProvider !== 'gemini');
+  const [modelsError, setModelsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (apiProvider === 'gemini') return;
+    let cancelled = false;
+    listModelsFromApi()
+      .then((models) => {
+        if (!cancelled) {
+          setRemoteModels(models);
+          setModelsLoading(false);
+        }
+      })
+      .catch((e: unknown) => {
+        if (!cancelled) {
+          setModelsError(e instanceof Error ? e.message : String(e));
+          setModelsLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [apiProvider]);
+
+  const currentModel = config?.getModel() || '';
+
+  const remoteModelOptions = useMemo(() => {
+    return remoteModels.map((m) => ({
+      value: m.id,
+      title: m.id,
+      description: m.owned_by ? `by ${m.owned_by}` : undefined,
+      key: m.id,
+    }));
+  }, [remoteModels]);
+
+  const remoteInitialIndex = useMemo(() => {
+    const idx = remoteModels.findIndex((m) => m.id === currentModel);
+    return idx >= 0 ? idx : 0;
+  }, [remoteModels, currentModel]);
+
+  const handleRemoteSelect = useCallback(
+    (modelId: string) => {
+      if (config) {
+        config.setModel(modelId, true);
+      }
+      onClose();
+    },
+    [config, onClose],
+  );
 
   useKeypress(
     (key) => {
@@ -53,7 +105,6 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
   );
 
   if (apiProvider !== 'gemini') {
-    const currentModel = config?.getModel() || '(not set)';
     return (
       <Box
         borderStyle="round"
@@ -65,15 +116,51 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
         <Text bold>Model ({apiProvider} provider)</Text>
         <Box marginTop={1}>
           <Text color={theme.text.primary}>
-            Current model: <Text bold>{currentModel}</Text>
+            Current model: <Text bold>{currentModel || '(not set)'}</Text>
           </Text>
         </Box>
-        <Box marginTop={1}>
-          <Text color={theme.text.secondary}>
-            Use --model flag or GEMINI_MODEL env var to change the model for{' '}
-            {apiProvider} providers.
-          </Text>
-        </Box>
+
+        {modelsLoading && (
+          <Box marginTop={1}>
+            <Text color={theme.text.secondary}>Loading models from API...</Text>
+          </Box>
+        )}
+
+        {modelsError && (
+          <Box marginTop={1}>
+            <Text color={theme.status.error}>
+              Failed to fetch models: {modelsError}
+            </Text>
+          </Box>
+        )}
+
+        {!modelsLoading && !modelsError && remoteModelOptions.length > 0 && (
+          <Box marginTop={1} flexDirection="column">
+            <Text color={theme.text.secondary}>
+              Select a model (Enter to confirm):
+            </Text>
+            <Box marginTop={1}>
+              <DescriptiveRadioButtonSelect
+                items={remoteModelOptions}
+                onSelect={handleRemoteSelect}
+                initialIndex={remoteInitialIndex}
+                showNumbers={true}
+                showScrollArrows={true}
+                maxItemsToShow={12}
+              />
+            </Box>
+          </Box>
+        )}
+
+        {!modelsLoading && !modelsError && remoteModelOptions.length === 0 && (
+          <Box marginTop={1}>
+            <Text color={theme.text.secondary}>
+              No models returned from API. Use --model flag or GEMINI_MODEL env
+              var.
+            </Text>
+          </Box>
+        )}
+
         <Box marginTop={1}>
           <Text color={theme.text.secondary}>(Press Esc to close)</Text>
         </Box>

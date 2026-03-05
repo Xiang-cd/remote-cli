@@ -323,7 +323,13 @@ export class Turn {
         }
 
         // Handle function calls (requesting tool execution)
-        const functionCalls = resp.functionCalls ?? [];
+        // resp.functionCalls is a getter on the SDK class; plain objects from
+        // custom providers (OpenAI/Anthropic adapters) don't have it, so fall
+        // back to extracting functionCall parts directly.
+        const functionCalls: FunctionCall[] = resp.functionCalls ??
+          (resp.candidates?.[0]?.content?.parts ?? [])
+            .filter((p) => p.functionCall)
+            .map((p) => p.functionCall as FunctionCall);
         for (const fnCall of functionCalls) {
           const event = this.handlePendingFunctionCall(fnCall, traceId);
           if (event) {

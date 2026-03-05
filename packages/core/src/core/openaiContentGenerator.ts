@@ -184,8 +184,11 @@ export class OpenAIContentGenerator implements ContentGenerator {
       Object.entries(serializableBody).filter(([, v]) => v !== undefined),
     );
 
+    const toolCount = Array.isArray(cleanBody['tools'])
+      ? (cleanBody['tools'] as unknown[]).length
+      : 0;
     debugLogger.debug(
-      `[OpenAI] POST ${url} model=${String(cleanBody['model'])}`,
+      `[OpenAI] POST ${url} model=${String(cleanBody['model'])} tools=${toolCount} tool_choice=${String(cleanBody['tool_choice'] ?? 'unset')}`,
     );
 
     const response = await fetch(url, {

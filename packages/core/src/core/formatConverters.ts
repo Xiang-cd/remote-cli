@@ -236,6 +236,7 @@ export function geminiRequestToOpenAI(
   model: string;
   messages: OpenAIChatMessage[];
   tools?: OpenAITool[];
+  tool_choice?: string;
   temperature?: number;
   max_tokens?: number;
   top_p?: number;
@@ -252,6 +253,8 @@ export function geminiRequestToOpenAI(
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const tools = config?.tools as Tool[] | undefined;
 
+  const convertedTools = geminiToolsToOpenAI(tools);
+
   const result: ReturnType<typeof geminiRequestToOpenAI> = {
     model: request.model ?? '',
     messages: geminiContentsToOpenAIMessages(
@@ -259,7 +262,8 @@ export function geminiRequestToOpenAI(
       request.contents as Content[] | undefined,
       systemInstruction,
     ),
-    tools: geminiToolsToOpenAI(tools),
+    tools: convertedTools,
+    tool_choice: convertedTools ? 'auto' : undefined,
     temperature: config?.temperature,
     top_p: config?.topP,
   };
@@ -626,6 +630,7 @@ export function geminiRequestToAnthropic(
   messages: AnthropicMessage[];
   system?: string;
   tools?: AnthropicTool[];
+  tool_choice?: { type: string };
   max_tokens: number;
   temperature?: number;
   top_p?: number;
@@ -647,11 +652,14 @@ export function geminiRequestToAnthropic(
     systemInstruction,
   );
 
+  const convertedTools = geminiToolsToAnthropic(tools);
+
   return {
     model: request.model ?? '',
     messages,
     system,
-    tools: geminiToolsToAnthropic(tools),
+    tools: convertedTools,
+    tool_choice: convertedTools ? { type: 'auto' } : undefined,
     max_tokens: config?.maxOutputTokens ?? 8192,
     temperature: config?.temperature,
     top_p: config?.topP,

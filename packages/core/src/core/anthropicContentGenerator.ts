@@ -145,8 +145,11 @@ export class AnthropicContentGenerator implements ContentGenerator {
       Object.entries(body).filter(([, v]) => v !== undefined),
     );
 
+    const toolCount = Array.isArray(cleanBody['tools'])
+      ? (cleanBody['tools'] as unknown[]).length
+      : 0;
     debugLogger.debug(
-      `[Anthropic] POST ${url} model=${String(cleanBody['model'])}`,
+      `[Anthropic] POST ${url} model=${String(cleanBody['model'])} tools=${toolCount} tool_choice=${JSON.stringify(cleanBody['tool_choice'] ?? 'unset')}`,
     );
 
     const response = await fetch(url, {
